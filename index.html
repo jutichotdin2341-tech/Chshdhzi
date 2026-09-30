@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>2D Mystery Explorer</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Kanit', sans-serif, Arial;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      background-color: #050508;
+      color: white;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      touch-action: none;
+    }
+
+    #game-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* --- 2D Canvas Area --- */
+    #canvas-container {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    canvas {
+      background-color: #111116;
+      border: 3px solid #333344;
+      border-radius: 8px;
+      box-shadow: 0 0 25px rgba(0,0,0,0.9);
+      image-rendering: pixelated;
+    }
+
+    .ui-overlay {
+      position: absolute;
+      top: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.75);
+      padding: 10px 20px;
+      border-radius: 20px;
+      border: 1px solid #444;
+      color: #ffda79;
+      font-size: 1.1rem;
+      pointer-events: none;
+      text-align: center;
+      white-space: nowrap;
+      z-index: 10;
+    }
+
+    /* --- Touch Virtual Joystick --- */
+    #joystick-wrapper {
+      position: absolute;
+      bottom: 25px;
+      left: 30px;
+      width: 120px;
+      height: 120px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      touch-action: none;
+      z-index: 20;
+    }
+
+    #joystick-stick {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 50px;
+      height: 50px;
+      background: rgba(0, 210, 211, 0.8);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 10px rgba(0, 210, 211, 0.5);
+      pointer-events: none;
+    }
+
+    .controls-hint {
+      margin-top: 10px;
+      color: #888;
+      font-size: 0.85rem;
+    }
+
+    /* --- Jump Scare --- */
+    #jumpscare-overlay {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: red;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 99;
+      animation: flash-scare 0.08s infinite;
+    }
+
+    .ghost-face {
+      font-size: 18rem;
+      transform: scale(1.8);
+      user-select: none;
+    }
+
+    @keyframes flash-scare {
+      0% { background: #ff0000; }
+      50% { background: #000000; }
+      100% { background: #880000; }
+    }
+
+    /* --- Error Pop-up --- */
+    #error-box {
+      position: absolute;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.92);
+      top: 0; left: 0; width: 100%; height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .error-content {
+      background: #18181c;
+      border: 2px solid #ff4757;
+      border-radius: 12px;
+      padding: 30px;
+      text-align: center;
+      box-shadow: 0 0 30px rgba(255, 71, 87, 0.6);
+      max-width: 400px;
+      width: 85%;
+    }
+
+    .error-content h3 {
+      color: #ff4757;
+      margin-bottom: 12px;
+      font-size: 1.6rem;
+    }
+
+    .error-content p {
+      color: #ddd;
+      margin-bottom: 25px;
+      font-size: 1.1rem;
+    }
+
+    .error-content button {
+      background: #ff4757;
+      color: white;
+      border: none;
+      padding: 12px 30px;
+      font-size: 1.1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: 0.2s;
+    }
+
+    .error-content button:hover {
+      background: #ff6b81;
+    }
+
+    /* --- ฉากจบสุดหวาน --- */
+    #love-message-screen {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background-color: #ff75a0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 101;
+      overflow: hidden;
+      padding: 20px;
+    }
+
+    .heart-bg {
+      position: absolute;
+      color: rgba(255, 255, 255, 0.35);
+      font-size: 2rem;
+      user-select: none;
+      animation: floatHeart 4s ease-in-out infinite alternate;
+    }
+
+    @keyframes floatHeart {
+      0% { transform: translateY(0) scale(1); }
+      100% { transform: translateY(-20px) scale(1.15); }
+    }
+
+    .love-card {
+      position: relative;
+      z-index: 10;
+      background: rgba(255, 255, 255, 0.94);
+      padding: 40px 30px;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+      text-align: center;
+      max-width: 500px;
+      width: 100%;
+    }
+
+    .love-text {
+      font-size: 1.4rem;
+      color: #d63031;
+      line-height: 1.8;
+      font-weight: bold;
+      white-space: pre-line;
+    }
+
+    /* ปุ่ม YouTube */
+    .yt-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 25px;
+      background-color: #ff0000;
+      color: white;
+      text-decoration: none;
+      font-size: 1.1rem;
+      font-weight: bold;
+      padding: 12px 24px;
+      border-radius: 30px;
+      box-shadow: 0 5px 15px rgba(255, 0, 0, 0.3);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.8s ease-in-out;
+      pointer-events: none;
+    }
+
+    .yt-btn.show {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .yt-btn:hover {
+      background-color: #cc0000;
+      transform: scale(1.05);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="game-container">
+    <!-- 2D Canvas Area -->
+    <div id="canvas-container">
+      <div class="ui-overlay" id="status-text">🔍 สำรวจห้องโถงร้าง (เดินไปหาของน่าสงสัย)</div>
+      <canvas id="gameCanvas" width="640" height="400"></canvas>
+      <div class="controls-hint">ใช้ Joystick หรือ ปุ่ม WASD / ลูกศร ในการบังคับตัวละคร</div>
+      
+      <!-- Virtual Joystick -->
+      <div id="joystick-wrapper">
+        <div id="joystick-stick"></div>
+      </div>
+    </div>
+
+    <!-- Jump Scare -->
+    <div id="jumpscare-overlay" class="hidden">
+      <div class="ghost-face">👻</div>
+    </div>
+
+    <!-- Error Pop-up -->
+    <div id="error-box" class="hidden">
+      <div class="error-content">
+        <h3>⚠️ เกิดข้อผิดพลาด</h3>
+        <p id="error-msg">เกิดข้อผิดพลาดรุนแรงในการโหลดเกม (Error Code: 0x8849)</p>
+        <button id="retry-btn">เริ่มต้นใหม่</button>
+      </div>
+    </div>
+
+    <!-- ฉากจบสุดหวาน -->
+    <div id="love-message-screen" class="hidden">
+      <div id="heart-background-container"></div>
+      <div class="love-card">
+        <div class="love-text" id="love-text-display"></div>
+        <!-- ลิงก์ไปยัง YouTube: เพลง เพราะพี่รักจริง -->
+        <a id="yt-link" href="https://www.youtube.com/results?search_query=เพราะพี่รักจริง" target="_blank" class="yt-btn">
+          ▶️ ฟังเพลง เพราะพี่รักจริง บน YouTube
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const statusText = document.getElementById('status-text');
+
+    let gameState = 'EXPLORE'; 
+    let itemsFound = 0;
+    let safeZoneReached = false; 
+    let retryCount = 0;
+    const maxRetries = 10;
+    const finalLoveMessage = "รักอ้วนที่สุดในโลกเลยคั้ป 🤍\nไม่ว่าตอนนี้จะห่างกันแค่ไหน เค้าจะพยายามทำทุกอย่างเพื่อไปหาอ้วนให้ได้แน่นอน\nรอเค้าหน่อยนะคนดี";
+
+    // ผู้เล่น
+    const player = {
+      x: 320,
+      y: 300,
+      size: 20,
+      speed: 3.5,
+      color: '#00d2d3'
+    };
+
+    // ผี
+    const ghost = {
+      x: -100,
+      y: -100,
+      size: 24,
+      normalSpeed: 0.3,
+      chargeSpeed: 5.0,
+      color: '#ff4757'
+    };
+
+    // เบาะแส
+    let clues = [
+      { x: 100, y: 100, label: '📚 ตู้หนังสือ', visited: false },
+      { x: 540, y: 100, label: '🗝️ ลิ้นชักเก่า', visited: false },
+      { x: 100, y: 320, label: '🖼️ รูปภาพ', visited: false }
+    ];
+
+    // Safe Zone
+    const safeZone = {
+      x: 500,
+      y: 280,
+      w: 110,
+      h: 100
+    };
+
+    // คีย์บอร์ด
+    const keys = {};
+    window.addEventListener('keydown', e => keys[e.key] = true);
+    window.addEventListener('keyup', e => keys[e.key] = false);
+
+    // --- ระบบ Joystick Control ---
+    const joyWrapper = document.getElementById('joystick-wrapper');
+    const joyStick = document.getElementById('joystick-stick');
+    let joyVector = { x: 0, y: 0 };
+    let joyActive = false;
+
+    function handleJoyMove(clientX, clientY) {
+      const rect = joyWrapper.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      
+      let deltaX = clientX - centerX;
+      let deltaY = clientY - centerY;
+      let dist = Math.hypot(deltaX, deltaY);
+      const maxRadius = rect.width / 2;
+
+      if (dist > maxRadius) {
+        deltaX = (deltaX / dist) * maxRadius;
+        deltaY = (deltaY / dist) * maxRadius;
+      }
+
+      joyStick.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
+      joyVector.x = deltaX / maxRadius;
+      joyVector.y = deltaY / maxRadius;
+    }
+
+    joyWrapper.addEventListener('touchstart', e => {
+      joyActive = true;
+      handleJoyMove(e.touches[0].clientX, e.touches[0].clientY);
+    });
+
+    window.addEventListener('touchmove', e => {
+      if (joyActive) handleJoyMove(e.touches[0].clientX, e.touches[0].clientY);
+    });
+
+    window.addEventListener('touchend', () => {
+      joyActive = false;
+      joyVector = { x: 0, y: 0 };
+      joyStick.style.transform = 'translate(-50%, -50%)';
+    });
+
+    joyWrapper.addEventListener('mousedown', e => {
+      joyActive = true;
+      handleJoyMove(e.clientX, e.clientY);
+    });
+
+    window.addEventListener('mousemove', e => {
+      if (joyActive) handleJoyMove(e.clientX, e.clientY);
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (joyActive) {
+        joyActive = false;
+        joyVector = { x: 0, y: 0 };
+        joyStick.style.transform = 'translate(-50%, -50%)';
+      }
+    });
+
+    // Audio Context เสียงสังเคราะห์
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playScreamSound() {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(950, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 1.5);
+      gain.gain.setValueAtTime(1, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.5);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 1.5);
+    }
+
+    function playLoudErrorSound() {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(160, audioCtx.currentTime);
+      osc.frequency.setValueAtTime(320, audioCtx.currentTime + 0.1);
+      osc.frequency.setValueAtTime(160, audioCtx.currentTime + 0.2);
+      gain.gain.setValueAtTime(0.9, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.8);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.8);
+    }
+
+    function playBeep() {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(500, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.1);
+    }
+
+    function gameLoop() {
+      update();
+      draw();
+      if (gameState !== 'END') {
+        requestAnimationFrame(gameLoop);
+      }
+    }
+
+    function update() {
+      let isMoving = false;
+
+      if (gameState === 'EXPLORE' || gameState === 'CHASE') {
+        if (joyActive && (Math.abs(joyVector.x) > 0.1 || Math.abs(joyVector.y) > 0.1)) {
+          player.x += joyVector.x * player.speed;
+          player.y += joyVector.y * player.speed;
+          isMoving = true;
+        }
+
+        if (keys['ArrowLeft'] || keys['a'] || keys['A']) { player.x -= player.speed; isMoving = true; }
+        if (keys['ArrowRight'] || keys['d'] || keys['D']) { player.x += player.speed; isMoving = true; }
+        if (keys['ArrowUp'] || keys['w'] || keys['W']) { player.y -= player.speed; isMoving = true; }
+        if (keys['ArrowDown'] || keys['s'] || keys['S']) { player.y += player.speed; isMoving = true; }
+
+        player.x = Math.max(15, Math.min(canvas.width - 15, player.x));
+        player.y = Math.max(15, Math.min(canvas.height - 15, player.y));
+      }
+
+      if (gameState === 'EXPLORE') {
+        clues.forEach(clue => {
+          if (!clue.visited) {
+            let dist = Math.hypot(player.x - clue.x, player.y - clue.y);
+            if (dist < 30) {
+              clue.visited = true;
+              itemsFound++;
+              try { playBeep(); } catch(e){}
+
+              if (itemsFound === 1) statusText.innerText = "🔍 พบโน้ตเตือนภัย: 'มีบางอย่างสุ่มตรวจอยู่...'";
+              if (itemsFound === 2) statusText.innerText = "🔍 พบกุญแจเก่า... แต่ได้ยินเสียงก้าวเท้า!";
+              
+              if (itemsFound >= 2) {
+                startChaseSequence();
+              }
+            }
+          }
+        });
+      }
+
+      if (gameState === 'CHASE') {
+        let currentGhostSpeed = isMoving ? ghost.normalSpeed : ghost.chargeSpeed;
+
+        let angle = Math.atan2(player.y - ghost.y, player.x - ghost.x);
+        ghost.x += Math.cos(angle) * currentGhostSpeed;
+        ghost.y += Math.sin(angle) * currentGhostSpeed;
+
+        let distToGhost = Math.hypot(player.x - ghost.x, player.y - ghost.y);
+        if (distToGhost < (player.size / 2 + ghost.size / 2)) {
+          triggerJumpScare();
+          return;
+        }
+
+        if (
+          player.x > safeZone.x && player.x < safeZone.x + safeZone.w &&
+          player.y > safeZone.y && player.y < safeZone.y + safeZone.h
+        ) {
+          enterSafeZone();
+        }
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = '#181820';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      clues.forEach(clue => {
+        ctx.fillStyle = clue.visited ? '#555' : '#ffda79';
+        ctx.beginPath();
+        ctx.arc(clue.x, clue.y, 12, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#fff';
+        ctx.font = '12px Kanit';
+        ctx.fillText(clue.label, clue.x - 25, clue.y - 18);
+      });
+
+      if (gameState === 'CHASE') {
+        ctx.fillStyle = 'rgba(46, 213, 115, 0.25)';
+        ctx.fillRect(safeZone.x, safeZone.y, safeZone.w, safeZone.h);
+        ctx.strokeStyle = '#2ed573';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(safeZone.x, safeZone.y, safeZone.w, safeZone.h);
+
+        ctx.fillStyle = '#2ed573';
+        ctx.font = '14px Kanit';
+        ctx.fillText('🛡️ SAFE ZONE', safeZone.x + 10, safeZone.y + 55);
+
+        ctx.fillStyle = ghost.color;
+        ctx.beginPath();
+        ctx.arc(ghost.x, ghost.y, ghost.size / 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.font = '16px Arial';
+        ctx.fillText('👻', ghost.x - 8, ghost.y + 5);
+      }
+
+      ctx.fillStyle = player.color;
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, player.size / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = '14px Arial';
+      ctx.fillText('🏃', player.x - 7, player.y + 5);
+    }
+
+    function startChaseSequence() {
+      gameState = 'CHASE';
+      statusText.innerText = "😱 ผีเดินตามมาอย่างช้าๆ... (หยุดเดินผีจะพุ่งใส่อย่างเร็ว!)";
+      statusText.style.color = "#ff4757";
+      
+      ghost.x = player.x - 180;
+      ghost.y = player.y;
+    }
+
+    function enterSafeZone() {
+      gameState = 'SAFE';
+      safeZoneReached = true; 
+      statusText.innerText = "🛡️ เข้า Safe Zone ปลอดภัยแล้ว...";
+      statusText.style.color = "#2ed573";
+
+      setTimeout(() => {
+        triggerJumpScare();
+      }, 2000);
+    }
+
+    function triggerJumpScare() {
+      gameState = 'SCARE';
+      document.getElementById('canvas-container').classList.add('hidden');
+      const jumpscare = document.getElementById('jumpscare-overlay');
+      jumpscare.classList.remove('hidden');
+      
+      try { playScreamSound(); } catch(e){}
+
+      setTimeout(() => {
+        jumpscare.classList.add('hidden');
+        document.getElementById('error-box').classList.remove('hidden');
+      }, 1200);
+    }
+
+    // ปุ่มเริ่มต้นใหม่
+    document.getElementById('retry-btn').addEventListener('click', () => {
+      if (!safeZoneReached) {
+        try { playBeep(); } catch(e){}
+        resetGameToStart();
+        return;
+      }
+
+      retryCount++;
+      if (retryCount < maxRetries) {
+        try { playBeep(); } catch(e){}
+        const errorBox = document.getElementById('error-box');
+        errorBox.classList.add('hidden');
+        
+        setTimeout(() => {
+          errorBox.classList.remove('hidden');
+        }, 150);
+      } else {
+        try { playLoudErrorSound(); } catch(e){}
+        document.getElementById('error-box').classList.add('hidden');
+        showLoveMessage();
+      }
+    });
+
+    function resetGameToStart() {
+      document.getElementById('error-box').classList.add('hidden');
+      document.getElementById('canvas-container').classList.remove('hidden');
+      
+      player.x = 320;
+      player.y = 300;
+      ghost.x = -100;
+      ghost.y = -100;
+      itemsFound = 0;
+      clues.forEach(c => c.visited = false);
+      
+      gameState = 'EXPLORE';
+      statusText.innerText = "🔍 สำรวจห้องโถงร้าง (เดินไปหาของน่าสงสัย)";
+      statusText.style.color = "#ffda79";
+    }
+
+    function showLoveMessage() {
+      gameState = 'END';
+      const loveScreen = document.getElementById('love-message-screen');
+      loveScreen.classList.remove('hidden');
+
+      // หัวใจลอย
+      const heartContainer = document.getElementById('heart-background-container');
+      const hearts = ['❤️', '💖', '💗', '💓', '💕', '🤍'];
+      for (let i = 0; i < 40; i++) {
+        const heart = document.createElement('div');
+        heart.className = 'heart-bg';
+        heart.innerText = hearts[Math.floor(Math.random() * hearts.length)];
+        heart.style.left = Math.random() * 100 + 'vw';
+        heart.style.top = Math.random() * 100 + 'vh';
+        heart.style.animationDelay = (Math.random() * 3) + 's';
+        heart.style.fontSize = (Math.random() * 2 + 1.5) + 'rem';
+        heartContainer.appendChild(heart);
+      }
+
+      document.getElementById('love-text-display').innerText = finalLoveMessage;
+
+      // รอ 10 วินาที แสดงปุ่มเปิดเพลง เพราะพี่รักจริง บน YouTube
+      setTimeout(() => {
+        document.getElementById('yt-link').classList.add('show');
+      }, 10000);
+    }
+
+    gameLoop();
+  </script>
+</body>
+</html>
